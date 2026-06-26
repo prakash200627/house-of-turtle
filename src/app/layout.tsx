@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import { AnnouncementBar, Header, CartDrawer, Footer } from "@/components/layout";
+import { WhatsAppButton } from "@/components/common";
+import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -33,11 +35,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${jost.variable} scroll-smooth`}>
       <body className="font-sans bg-offwhite text-espresso antialiased min-h-screen flex flex-col">
-        <AnnouncementBar />
-        <Header />
-        <CartDrawer />
-        <main className="flex-grow">{children}</main>
-        <Footer />
+        <SessionProvider>
+          <AnnouncementBar />
+          <Header />
+          <CartDrawer />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+          <WhatsAppButton />
+        </SessionProvider>
       </body>
     </html>
   );

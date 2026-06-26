@@ -7,6 +7,7 @@ import { Product } from "./product";
 export interface CartItem {
   product: Product;
   quantity: number;
+  size?: string;
 }
 
 /**
@@ -16,9 +17,9 @@ export interface CartItem {
 export interface CartState {
   items: CartItem[];
   isOpen: boolean;
-  addItem: (product: Product, qty: number) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, qty: number) => void;
+  addItem: (product: Product, qty: number, size?: string) => void;
+  removeItem: (id: string, size?: string) => void;
+  updateQuantity: (id: string, qty: number, size?: string) => void;
   clearCart: () => void;
   toggleOpen: () => void;
 }

@@ -1,0 +1,15 @@
+# Normalize line endings to LF on check-in, convert to CRLF on Windows checkout
+* text=auto eol=lf
+
+# Explicitly declare binary files so git doesn't try to convert them
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
+import { useAuthStore } from "@/stores/authStore";
 import { formatPrice } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/Sheet";
 import { useMounted } from "@/hooks/useMounted";
@@ -17,6 +18,7 @@ import { useMounted } from "@/hooks/useMounted";
  */
 export function CartDrawer() {
   const { items, isOpen, toggleOpen, updateQuantity, removeItem } = useCartStore();
+  const { isLoggedIn } = useAuthStore();
   const router = useRouter();
   const mounted = useMounted();
 
@@ -79,8 +81,8 @@ export function CartDrawer() {
                           {item.product.name}
                         </h4>
                         <button
-                          onClick={() => removeItem(item.product.id)}
-                          className="text-sand hover:text-red-600 transition-colors p-1"
+                          onClick={() => removeItem(item.product.id, item.size)}
+                          className="text-sand hover:text-red-650 transition-colors p-1"
                           aria-label="Remove item"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -89,13 +91,18 @@ export function CartDrawer() {
                       <p className="text-xs text-sand uppercase tracking-wider mt-0.5">
                         {item.product.category}
                       </p>
+                      {item.size && (
+                        <p className="text-[10px] text-gold font-bold uppercase tracking-wider mt-0.5">
+                          Size: {item.size}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center mt-2">
                       {/* Qty Stepper */}
                       <div className="flex items-center border border-gold/30 rounded-pill bg-white px-2 py-1">
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.size)}
                           className="text-espresso hover:text-gold-bright p-1"
                           aria-label="Decrease quantity"
                         >
@@ -105,7 +112,7 @@ export function CartDrawer() {
                           {item.quantity}
                         </span>
                         <button
-                          onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.size)}
                           className="text-espresso hover:text-gold-bright p-1"
                           aria-label="Increase quantity"
                         >
@@ -138,7 +145,11 @@ export function CartDrawer() {
             <button
               onClick={() => {
                 toggleOpen();
-                router.push("/checkout");
+                if (!isLoggedIn) {
+                  router.push("/login?redirect=/checkout");
+                } else {
+                  router.push("/checkout");
+                }
               }}
               className="w-full bg-gold hover:bg-gold-light text-espresso font-semibold uppercase tracking-widest text-xs py-4 rounded-pill transition-colors flex items-center justify-center shadow-md"
             >

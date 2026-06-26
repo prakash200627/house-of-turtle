@@ -15,6 +15,8 @@ import { products } from "@/data/products";
 import { formatPrice } from "@/lib/utils";
 import Image from "next/image";
 import { useMounted } from "@/hooks/useMounted";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
 
 /**
  * Header Component
@@ -28,7 +30,16 @@ export function Header() {
   const router = useRouter();
   const cartStore = useCartStore();
   const wishlistStore = useWishlistStore();
-  const { isLoggedIn, user, logout } = useAuthStore();
+  const { data: session, status } = useSession();
+  const setSession = useAuthStore((s) => s.setSession);
+  const signOutAction = useAuthStore((s) => s.signOut);
+  const user = useAuthStore((s) => s.user);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+
+  useEffect(() => {
+    setSession(session, status);
+  }, [session, status, setSession]);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mounted = useMounted();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -298,20 +309,9 @@ export function Header() {
                     className="p-2 text-espresso hover:text-gold-bright transition-colors flex items-center justify-center"
                     aria-label="User Profile"
                   >
-                    {user?.image ? (
-                      <div className="relative h-5 w-5 rounded-full overflow-hidden border border-gold/25">
-                        <Image
-                          src={user.image}
-                          alt={user.name || "User Avatar"}
-                          fill
-                          sizes="20px"
-                          className="object-cover"
-                          unoptimized={true}
-                        />
-                      </div>
-                    ) : (
-                      <User className="h-5 w-5" />
-                    )}
+                    <div className="h-6 w-6 rounded-full bg-gold text-espresso flex items-center justify-center text-[14px] font-bold uppercase tracking-wider border border-gold/25 select-none">
+                      {user?.name ? user.name.charAt(0).toUpperCase() : "U"}  
+                    </div>
                   </button>
                   {/* Dropdown Menu */}
                   <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-gold/15 rounded-md shadow-card py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-[opacity,visibility] duration-100 z-50">
@@ -331,22 +331,16 @@ export function Header() {
                       My Orders
                     </Link>
                     <Link
-                      href="/wishlist"
-                      className="w-full text-left block px-4 py-2 text-xs font-semibold text-espresso hover:bg-cream/40 hover:text-gold-bright transition-colors"
-                    >
-                      Wishlist
-                    </Link>
-                    <Link
                       href="/account?tab=addresses"
                       className="w-full text-left block px-4 py-2 text-xs font-semibold text-espresso hover:bg-cream/40 hover:text-gold-bright transition-colors"
                     >
                       Saved Addresses
                     </Link>
                     <button
-                      onClick={logout}
+                      onClick={signOutAction}
                       className="w-full text-left block px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors border-t border-gold/5 uppercase tracking-wider"
                     >
-                      Logout
+                      Sign Out
                     </button>
                   </div>
                 </>

@@ -10,7 +10,9 @@ import { formatPrice } from "@/lib/utils";
 import { StarRating } from "@/components/common/StarRating";
 import { ProductCard } from "@/components/product/ProductCard";
 import { products } from "@/data/products";
-import { Plus, Minus, Heart, ShoppingBag, ShieldCheck, Truck, RefreshCw } from "lucide-react";
+import { Plus, Minus, Heart, ShoppingBag, ShieldCheck, Truck, RefreshCw, ZoomIn } from "lucide-react";
+import { SizeGuideModal, PincodeChecker, ImageLightbox } from "@/components/product";
+import { motion } from "framer-motion";
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
@@ -27,6 +29,13 @@ export default function ProductDetailPage() {
 
   const [quantity, setQuantity] = useState(1);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+
+  // New PDP States
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [sizeError, setSizeError] = useState(false);
+  const [shake, setShake] = useState(false);
+  const [sizeGuideOpen, setSizeGuideOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   if (!product) {
     return (
@@ -57,7 +66,14 @@ export default function ProductDetailPage() {
     product.badge === "Limited" || product.badge === "Sold Out" ? "low-stock" : "gold";
 
   const handleAddToCart = () => {
-    cartStore.addItem(product, quantity);
+    if (!selectedSize) {
+      setSizeError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    setSizeError(false);
+    cartStore.addItem(product, quantity, selectedSize);
   };
 
   const handleWishlistToggle = () => {
@@ -87,7 +103,11 @@ export default function ProductDetailPage() {
           {/* Left Column: Image Gallery (5 Cols) */}
           <div className="lg:col-span-6 space-y-4">
             {/* Main Image */}
-            <div className="relative aspect-square w-full rounded-card overflow-hidden bg-cream border border-gold/15 shadow-inner">
+            <div
+              onClick={() => setLightboxOpen(true)}
+              className="relative aspect-square w-full rounded-card overflow-hidden bg-cream border border-gold/15 shadow-inner cursor-zoom-in group/image"
+              title="Click to zoom"
+            >
               <Image
                 src={product.images[activeImageIdx] || product.image}
                 alt={product.name}
@@ -97,6 +117,16 @@ export default function ProductDetailPage() {
                 className="object-cover"
                 unoptimized={true}
               />
+              
+              {/* ZoomIn Icon overlay */}
+              <div className="absolute bottom-4 right-4 bg-white/85 p-2 rounded-full border border-gold/25 text-espresso shadow-md opacity-75 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+                <ZoomIn className="h-4 w-4" />
+              </div>
+
+              {/* Tooltip on hover */}
+              <div className="absolute bottom-12 right-4 bg-espresso/90 text-cream text-[10px] uppercase tracking-widest font-bold px-2.5 py-1 rounded shadow-md opacity-0 group-hover/image:opacity-100 transition-opacity duration-150 pointer-events-none border border-gold/15">
+                Click to zoom
+              </div>
               
               {product.badge && (
                 <div className="absolute top-4 left-4 z-10 pointer-events-none">
@@ -178,6 +208,55 @@ export default function ProductDetailPage() {
               <p>{product.description}</p>
             </div>
 
+            {/* Size Selector Section */}
+            <motion.div
+              animate={shake ? { x: [0, 10, -10, 10, -10, 0] } : {}}
+              transition={{ duration: 0.4 }}
+              className="space-y-3 pt-4 border-t border-gold/10"
+            >
+              <div className="flex justify-between items-center text-xs font-semibold uppercase tracking-wider">
+                <span className="text-espresso">Select Size</span>
+                <button
+                  onClick={() => setSizeGuideOpen(true)}
+                  className="text-gold hover:text-gold-light transition-colors normal-case font-bold cursor-pointer"
+                >
+                  Size Guide &rarr;
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                {[
+                  { label: "S (16cm)", value: "S" },
+                  { label: "M (18cm)", value: "M" },
+                  { label: "L (20cm)", value: "L", disabled: true },
+                ].map((sizeOpt) => (
+                  <button
+                    key={sizeOpt.value}
+                    disabled={sizeOpt.disabled}
+                    onClick={() => {
+                      setSelectedSize(sizeOpt.value);
+                      setSizeError(false);
+                    }}
+                    className={`px-5 py-2.5 border text-xs font-bold uppercase tracking-wider rounded-md transition-all ${
+                      sizeOpt.disabled
+                        ? "border-sand/20 text-sand/40 opacity-40 cursor-not-allowed line-through"
+                        : selectedSize === sizeOpt.value
+                        ? "bg-espresso border-espresso text-cream"
+                        : "bg-white border-sand/35 text-sand hover:border-espresso hover:text-espresso"
+                    }`}
+                  >
+                    {sizeOpt.label}
+                  </button>
+                ))}
+              </div>
+
+              {sizeError && (
+                <p className="text-[12px] text-red-500 font-semibold pl-1">
+                  Please select a size
+                </p>
+              )}
+            </motion.div>
+
             {/* Add to Cart Actions */}
             <div className="space-y-4 pt-4 border-t border-gold/10">
               <div className="flex flex-col sm:flex-row gap-4 items-center">
@@ -236,6 +315,9 @@ export default function ProductDetailPage() {
 
               </div>
             </div>
+
+            {/* Pincode Checker */}
+            <PincodeChecker />
 
             {/* Spec details card list */}
             <div className="bg-cream/25 border border-gold/10 rounded-md p-5 space-y-4">
@@ -301,6 +383,17 @@ export default function ProductDetailPage() {
             </div>
           </section>
         )}
+
+        {/* Lightbox / Modals */}
+        <SizeGuideModal open={sizeGuideOpen} onOpenChange={setSizeGuideOpen} />
+        
+        <ImageLightbox
+          open={lightboxOpen}
+          onOpenChange={setLightboxOpen}
+          images={product.images}
+          activeIndex={activeImageIdx}
+          setActiveIndex={setActiveImageIdx}
+        />
 
       </div>
     </div>

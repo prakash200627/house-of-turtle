@@ -13,10 +13,10 @@ export const useCartStore = create<CartState>()(
       items: [],
       isOpen: false,
 
-      addItem: (product: Product, qty: number) => {
+      addItem: (product: Product, qty: number, size?: string) => {
         set((state) => {
           const existingItemIndex = state.items.findIndex(
-            (item) => item.product.id === product.id
+            (item) => item.product.id === product.id && item.size === size
           );
 
           if (existingItemIndex > -1) {
@@ -25,20 +25,20 @@ export const useCartStore = create<CartState>()(
             return { items: updatedItems, isOpen: true }; // Open cart drawer on add
           }
 
-          return { items: [...state.items, { product, quantity: qty }], isOpen: true };
+          return { items: [...state.items, { product, quantity: qty, size }], isOpen: true };
         });
       },
 
-      removeItem: (id: string) => {
+      removeItem: (id: string, size?: string) => {
         set((state) => ({
-          items: state.items.filter((item) => item.product.id !== id),
+          items: state.items.filter((item) => !(item.product.id === id && item.size === size)),
         }));
       },
 
-      updateQuantity: (id: string, qty: number) => {
+      updateQuantity: (id: string, qty: number, size?: string) => {
         set((state) => ({
           items: state.items.map((item) =>
-            item.product.id === id
+            item.product.id === id && item.size === size
               ? { ...item, quantity: Math.max(1, qty) }
               : item
           ),

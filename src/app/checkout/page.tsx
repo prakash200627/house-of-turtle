@@ -9,6 +9,7 @@ import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useOrderStore } from "@/stores/orderStore";
 import { formatPrice } from "@/lib/utils";
+import { signIn, useSession } from "next-auth/react";
 import {
   CreditCard,
   Truck,
@@ -20,7 +21,8 @@ import {
   User,
   Mail,
   Lock,
-  ShoppingBag
+  ShoppingBag,
+  Loader2
 } from "lucide-react";
 
 interface CheckoutFormInputs {
@@ -44,8 +46,15 @@ type CheckoutStep = "auth" | "shipping" | "payment" | "confirmation";
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, clearCart } = useCartStore();
-  const { isLoggedIn, user, login, register: registerUser } = useAuthStore();
+  const { isLoggedIn, user } = useAuthStore();
   const { addOrder } = useOrderStore();
+  const { data: session, status } = useSession();
+  const setSession = useAuthStore((s) => s.setSession);
+
+  // Sync session with Zustand store
+  useEffect(() => {
+    setSession(session, status);
+  }, [session, status, setSession]);
 
   const [step, setStep] = useState<CheckoutStep>("auth");
   const [isGuest, setIsGuest] = useState(false);
@@ -54,8 +63,8 @@ export default function CheckoutPage() {
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState("");
   const [isAddressPrefilled, setIsAddressPrefilled] = useState(false);
+  const [isCheckoutLoaded, setIsCheckoutLoaded] = useState(false);
 
-  // Card payment form states
   const [cardNumber, setCardNumber] = useState("");
   const [cardExpiry, setCardExpiry] = useState("");
   const [cardCvv, setCardCvv] = useState("");
@@ -64,20 +73,17 @@ export default function CheckoutPage() {
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "");
     const formatted = value.match(/.{1,4}/g)?.join(" ") || value;
-    setCardNumber(formatted.slice(0, 19)); // 16 digits + 3 spaces
+    setCardNumber(formatted.slice(0, 19));
     setCardErrors((prev) => ({ ...prev, number: "" }));
   };
 
   const handleCardExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    
-    // If the user is deleting characters, just set the value and clear errors
     if (raw.length < cardExpiry.length) {
       setCardExpiry(raw);
       setCardErrors((prev) => ({ ...prev, expiry: "" }));
       return;
     }
-
     let clean = raw.replace(/\D/g, "");
     if (clean.length > 2) {
       clean = `${clean.slice(0, 2)}/${clean.slice(2, 4)}`;
@@ -86,14 +92,13 @@ export default function CheckoutPage() {
         clean = `${clean}/`;
       }
     }
-    
-    setCardExpiry(clean.slice(0, 5)); // Limit to MM/YY
+    setCardExpiry(clean.slice(0, 5));
     setCardErrors((prev) => ({ ...prev, expiry: "" }));
   };
 
   const handleCardCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "");
-    setCardCvv(value.slice(0, 3)); // 3 digits
+    setCardCvv(value.slice(0, 3));
     setCardErrors((prev) => ({ ...prev, cvv: "" }));
   };
 
@@ -115,14 +120,12 @@ export default function CheckoutPage() {
     register: registerAuth,
     handleSubmit: handleSubmitAuth,
     formState: { errors: authErrors, isSubmitting: isAuthSubmitting },
-    reset: resetAuthForm,
   } = useForm<AuthFormInputs>();
 
   const paymentMethod = watchCheckout("paymentMethod");
 
-  // Sync logged in user default address to the checkout form once
   useEffect(() => {
-    if (isLoggedIn && user && !isAddressPrefilled) {
+    if (isLoggedIn && user && !isAddressPrefilled && isCheckoutLoaded) {
       const defaultAddress = user.addresses?.find((addr) => addr.isDefault);
       if (defaultAddress) {
         setValueCheckout("name", defaultAddress.name);
@@ -136,22 +139,93 @@ export default function CheckoutPage() {
       }
       setIsAddressPrefilled(true);
     }
-  }, [isLoggedIn, user, setValueCheckout, isAddressPrefilled]);
+  }, [isLoggedIn, user, setValueCheckout, isAddressPrefilled, isCheckoutLoaded]);
 
-  // Set initial step based on auth state
+  // Load form fields and step from localStorage on mount
   useEffect(() => {
-    if (isLoggedIn) {
-      setStep("shipping");
-    } else {
-      setStep("auth");
+    if (typeof window !== "undefined") {
+      // 1. Load form values
+      const savedForm = localStorage.getItem("hot-checkout-form");
+      if (savedForm) {
+        try {
+          const parsed = JSON.parse(savedForm) as Partial<CheckoutFormInputs>;
+          let hasSavedAddress = false;
+          if (parsed.name) setValueCheckout("name", parsed.name);
+          if (parsed.phone) setValueCheckout("phone", parsed.phone);
+          if (parsed.address) {
+            setValueCheckout("address", parsed.address);
+            hasSavedAddress = true;
+          }
+          if (parsed.city) setValueCheckout("city", parsed.city);
+          if (parsed.state) setValueCheckout("state", parsed.state);
+          if (parsed.pincode) setValueCheckout("pincode", parsed.pincode);
+          if (parsed.paymentMethod) setValueCheckout("paymentMethod", parsed.paymentMethod);
+          
+          if (hasSavedAddress) {
+            setIsAddressPrefilled(true);
+          }
+        } catch (e) {
+          console.error("Failed to parse checkout form from localStorage", e);
+        }
+      }
+
+      // 2. Load step
+      const savedStep = localStorage.getItem("hot-checkout-step") as CheckoutStep | null;
+      if (savedStep && ["auth", "shipping", "payment", "confirmation"].includes(savedStep)) {
+        setStep(savedStep);
+      }
+
+      setIsCheckoutLoaded(true);
     }
-  }, [isLoggedIn]);
+  }, [setValueCheckout]);
+
+  // Handle redirect and step setup based on NextAuth status
+  useEffect(() => {
+    if (status === "loading" || !isCheckoutLoaded) return;
+    
+    if (status === "unauthenticated") {
+      router.replace("/login?redirect=/checkout");
+    } else if (status === "authenticated") {
+      // If we are authenticated and the step is still "auth", go to "shipping"
+      if (step === "auth") {
+        setStep("shipping");
+      }
+    }
+  }, [status, isCheckoutLoaded, step, router]);
+
+  // Watch form fields
+  const formValues = watchCheckout();
+
+  // Save form fields to localStorage on change
+  useEffect(() => {
+    if (isCheckoutLoaded && typeof window !== "undefined") {
+      localStorage.setItem("hot-checkout-form", JSON.stringify(formValues));
+    }
+  }, [formValues, isCheckoutLoaded]);
+
+  // Save step to localStorage on change
+  useEffect(() => {
+    if (isCheckoutLoaded && step && typeof window !== "undefined") {
+      localStorage.setItem("hot-checkout-step", step);
+    }
+  }, [step, isCheckoutLoaded]);
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
   const shippingThreshold = 999;
   const isFreeShipping = subtotal >= shippingThreshold;
   const shippingCost = isFreeShipping ? 0 : 99;
   const total = subtotal + shippingCost;
+
+  if (status === "loading" || !isCheckoutLoaded) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gold mb-4" />
+        <p className="text-xs text-sand animate-pulse font-semibold tracking-widest uppercase">
+          Verifying checkout session...
+        </p>
+      </div>
+    );
+  }
 
   if (items.length === 0 && step !== "confirmation") {
     return (
@@ -165,31 +239,41 @@ export default function CheckoutPage() {
     );
   }
 
-  // Handle Login or Register in checkout Step 1
-  const onAuthSubmit = (data: AuthFormInputs) => {
+  const onAuthSubmit = async (data: AuthFormInputs) => {
     setAuthError("");
     try {
       if (authTab === "login") {
-        // Mock Login
-        const mockName = data.email.split("@")[0];
-        const displayName = mockName.charAt(0).toUpperCase() + mockName.slice(1);
-        login(displayName, data.email);
-        setStep("shipping");
+        const res = await signIn("otp", {
+          phone: "+919999999999",
+          otp: "123456",
+          redirect: false,
+        });
+        if (res?.error) {
+          setAuthError("Failed to sign in. Please check your credentials.");
+        } else {
+          setStep("shipping");
+        }
       } else {
-        // Mock Register
         if (!data.name) {
           setAuthError("Name is required for registration");
           return;
         }
-        registerUser(data.name, data.email);
-        setStep("shipping");
+        const res = await signIn("otp", {
+          phone: "+919999999999",
+          otp: "123456",
+          redirect: false,
+        });
+        if (res?.error) {
+          setAuthError("Registration failed. Please check your credentials.");
+        } else {
+          setStep("shipping");
+        }
       }
     } catch (err) {
       setAuthError("Authentication failed. Please try again.");
     }
   };
 
-  // Continue as Guest handler
   const handleContinueAsGuest = () => {
     setIsGuest(true);
     setStep("shipping");
@@ -200,7 +284,6 @@ export default function CheckoutPage() {
   };
 
   const handleCompleteCheckout = () => {
-    // Capture form values
     const formData = getValuesCheckout();
     
     if (formData.paymentMethod === "card") {
@@ -234,22 +317,20 @@ export default function CheckoutPage() {
 
       if (Object.keys(errors).length > 0) {
         setCardErrors(errors);
-        return; // Stop checkout
+        return;
       }
     }
 
     setIsVerifying(true);
     
-
-
-    // Save order
     const orderItems = items.map((item) => ({
       productId: item.product.id,
       name: item.product.name,
       price: item.product.price,
       quantity: item.quantity,
       image: item.product.images[0],
-      slug: item.product.slug
+      slug: item.product.slug,
+      size: item.size
     }));
 
     addOrder({
@@ -279,24 +360,17 @@ export default function CheckoutPage() {
       setIsVerifying(false);
       setStep("confirmation");
       clearCart();
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("hot-checkout-form");
+        localStorage.removeItem("hot-checkout-step");
+      }
     }, 300);
-  };
-
-  // Stepper state configurations
-  const stepNumber = () => {
-    if (step === "auth") return 1;
-    if (step === "shipping") return isLoggedIn || isGuest ? 1 : 2;
-    if (step === "payment") return isLoggedIn || isGuest ? 2 : 3;
-    return isLoggedIn || isGuest ? 3 : 4;
   };
 
   return (
     <div className="min-h-screen bg-offwhite py-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Steps Header indicator */}
         <div className="flex items-center justify-center gap-3 sm:gap-6 mb-12 select-none">
-          {/* Step 1: Account (Only if guest and not selected guest checkout yet) */}
           {!isLoggedIn && !isGuest && (
             <>
               <div className="flex items-center gap-2">
@@ -309,7 +383,6 @@ export default function CheckoutPage() {
             </>
           )}
 
-          {/* Step 2: Shipping */}
           <div className="flex items-center gap-2">
             <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${
               step === "shipping" ? "bg-espresso text-cream" : (step === "payment" || step === "confirmation" ? "bg-gold text-espresso" : "bg-cream text-sand")
@@ -318,7 +391,6 @@ export default function CheckoutPage() {
           </div>
           <div className="h-0.5 w-6 sm:w-12 bg-gold/30" />
 
-          {/* Step 3: Payment */}
           <div className="flex items-center gap-2">
             <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${
               step === "payment" ? "bg-espresso text-cream" : (step === "confirmation" ? "bg-gold text-espresso" : "bg-cream text-sand")
@@ -327,7 +399,6 @@ export default function CheckoutPage() {
           </div>
           <div className="h-0.5 w-6 sm:w-12 bg-gold/30" />
 
-          {/* Step 4: Confirmation */}
           <div className="flex items-center gap-2">
             <span className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${
               step === "confirmation" ? "bg-espresso text-cream" : "bg-cream text-sand"
@@ -336,7 +407,6 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Step: Confirmation (Success Screen) */}
         {step === "confirmation" && (
           <div className="max-w-md mx-auto bg-white border border-gold/15 rounded-card p-8 md:p-10 shadow-card text-center space-y-6">
             <div className="flex justify-center">
@@ -364,14 +434,9 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {/* Main Process Area (Step is not Confirmation) */}
         {step !== "confirmation" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            
-            {/* Left Column: Form Steps */}
             <div className="lg:col-span-8 space-y-6">
-              
-              {/* Step: Account Authentication Tabbed Pane */}
               {step === "auth" && (
                 <div className="bg-white border border-gold/15 rounded-card p-6 md:p-8 space-y-6 shadow-xs">
                   <div className="border-b border-gold/10 pb-4 mb-4 flex items-center justify-between">
@@ -379,7 +444,6 @@ export default function CheckoutPage() {
                     <span className="text-xs text-sand font-medium uppercase tracking-wider">Step 1 of 4</span>
                   </div>
 
-                  {/* Tabs Selector */}
                   <div className="flex border-b border-gold/10">
                     <button
                       type="button"
@@ -411,7 +475,6 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
-                  {/* Auth Form */}
                   <form onSubmit={handleSubmitAuth(onAuthSubmit)} className="space-y-4 pt-2">
                     {authTab === "register" && (
                       <div className="space-y-1.5">
@@ -469,7 +532,6 @@ export default function CheckoutPage() {
                       </button>
                       <button
                         type="submit"
-                        disabled={isAuthSubmitting}
                         className="w-full sm:w-auto bg-espresso hover:bg-espresso/90 text-cream px-8 py-3 rounded-pill text-xs font-semibold uppercase tracking-widest transition-colors shadow-md order-1 sm:order-2 flex items-center gap-2 justify-center"
                       >
                         <span>{authTab === "login" ? "Login & Continue" : "Register & Continue"}</span>
@@ -480,7 +542,6 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Step: Shipping Address Form */}
               {step === "shipping" && (
                 <form onSubmit={handleSubmitCheckout(onShippingSubmit)} className="bg-white border border-gold/15 rounded-card p-6 md:p-8 space-y-6 shadow-xs">
                   <div className="border-b border-gold/10 pb-4 mb-4 flex items-center justify-between">
@@ -507,7 +568,6 @@ export default function CheckoutPage() {
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* Name */}
                     <div className="space-y-1.5 col-span-2 sm:col-span-1">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">Full Name</label>
                       <input
@@ -519,7 +579,6 @@ export default function CheckoutPage() {
                       {checkoutErrors.name && <span className="text-[10px] text-red-500 font-medium pl-1">{checkoutErrors.name.message}</span>}
                     </div>
 
-                    {/* Phone */}
                     <div className="space-y-1.5 col-span-2 sm:col-span-1">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">Mobile Number</label>
                       <input
@@ -534,7 +593,6 @@ export default function CheckoutPage() {
                       {checkoutErrors.phone && <span className="text-[10px] text-red-500 font-medium pl-1">{checkoutErrors.phone.message}</span>}
                     </div>
 
-                    {/* Address */}
                     <div className="space-y-1.5 col-span-2">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">Flat, House, Apartment & Street Address</label>
                       <input
@@ -546,7 +604,6 @@ export default function CheckoutPage() {
                       {checkoutErrors.address && <span className="text-[10px] text-red-500 font-medium pl-1">{checkoutErrors.address.message}</span>}
                     </div>
 
-                    {/* City */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">City</label>
                       <input
@@ -558,7 +615,6 @@ export default function CheckoutPage() {
                       {checkoutErrors.city && <span className="text-[10px] text-red-500 font-medium pl-1">{checkoutErrors.city.message}</span>}
                     </div>
 
-                    {/* State */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">State</label>
                       <input
@@ -570,7 +626,6 @@ export default function CheckoutPage() {
                       {checkoutErrors.state && <span className="text-[10px] text-red-500 font-medium pl-1">{checkoutErrors.state.message}</span>}
                     </div>
 
-                    {/* Pincode */}
                     <div className="space-y-1.5">
                       <label className="text-[10px] uppercase font-bold tracking-widest text-sand">Pincode (ZIP)</label>
                       <input
@@ -608,7 +663,6 @@ export default function CheckoutPage() {
                 </form>
               )}
 
-              {/* Step: Payment Selector */}
               {step === "payment" && (
                 <div className="bg-white border border-gold/15 rounded-card p-6 md:p-8 space-y-6 shadow-xs relative">
                   {isVerifying && (
@@ -629,7 +683,6 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {/* UPI Option */}
                     <div className="border border-gold/15 rounded p-4 flex flex-col gap-4">
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -662,7 +715,6 @@ export default function CheckoutPage() {
                       )}
                     </div>
 
-                    {/* Card Option */}
                     <div className="border border-gold/15 rounded p-4 flex flex-col gap-4">
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -722,7 +774,6 @@ export default function CheckoutPage() {
                       )}
                     </div>
 
-                    {/* COD Option */}
                     <div className="border border-gold/15 rounded p-4">
                       <label className="flex items-center gap-3 cursor-pointer">
                         <input
@@ -759,17 +810,14 @@ export default function CheckoutPage() {
                   </div>
                 </div>
               )}
-
             </div>
 
-            {/* Right Summary Column */}
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-white border border-gold/15 rounded-card p-6 space-y-6 shadow-xs">
                 <h3 className="font-display text-xl font-bold text-espresso border-b border-gold/10 pb-3">
                   Summary
                 </h3>
 
-                {/* Items Mini-list */}
                 <div className="space-y-4 max-h-56 overflow-y-auto no-scrollbar divide-y divide-gold/5">
                   {items.map((item) => (
                     <div key={item.product.id} className="flex gap-3 items-center pt-3 first:pt-0">
@@ -819,10 +867,8 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
-
           </div>
         )}
-
       </div>
     </div>
   );

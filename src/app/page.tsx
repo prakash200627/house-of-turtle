@@ -5,7 +5,8 @@ import {
   TrendingProducts,
   StyleGuide,
   TrustBar,
-  FAQ
+  FAQ,
+  PromoBanner
 } from "@/components/sections";
 
 /**
@@ -17,6 +18,7 @@ export default function Home() {
     <div className="w-full flex flex-col">
       <Hero />
       <CollectionGrid />
+      <PromoBanner />
       <TrendingProducts />
       <StyleGuide />
       <TrustBar />

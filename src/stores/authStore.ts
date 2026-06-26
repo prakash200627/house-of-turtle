@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { signOut } from "next-auth/react";
 
 export interface Address {
   id: string;
@@ -22,9 +23,9 @@ interface User {
 interface AuthState {
   isLoggedIn: boolean;
   user: User | null;
-  login: (name: string, email: string) => void;
-  register: (name: string, email: string) => void;
-  logout: () => void;
+  status: "loading" | "authenticated" | "unauthenticated";
+  setSession: (session: any, status: "loading" | "authenticated" | "unauthenticated") => void;
+  signOut: () => Promise<void>;
   addAddress: (address: Omit<Address, "id">) => void;
   removeAddress: (id: string) => void;
   setDefaultAddress: (id: string) => void;
@@ -32,32 +33,37 @@ interface AuthState {
 
 /**
  * Zustand authentication store
- * Manages user login state and persists to localStorage.
- * Manages user addresses client-side.
+ * Integrates NextAuth session data and manages user addresses.
  */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       isLoggedIn: false,
       user: null,
+      status: "loading",
 
-      login: (name: string, email: string) => {
+      setSession: (session, status) => {
         set((state) => {
-          const existingAddresses =
-            state.user?.email === email ? state.user.addresses || [] : [];
+          const authUser = session?.user
+            ? {
+                name: session.user.name || "",
+                email: session.user.email || "",
+                image: session.user.image || "",
+                addresses: state.user?.addresses || [],
+              }
+            : null;
+
           return {
-            isLoggedIn: true,
-            user: { name, email, addresses: existingAddresses },
+            status,
+            isLoggedIn: status === "authenticated",
+            user: authUser,
           };
         });
       },
 
-      register: (name: string, email: string) => {
-        set({ isLoggedIn: true, user: { name, email, addresses: [] } });
-      },
-
-      logout: () => {
-        set({ isLoggedIn: false, user: null });
+      signOut: async () => {
+        await signOut({ redirect: true, callbackUrl: "/" });
+        set({ isLoggedIn: false, user: null, status: "unauthenticated" });
       },
 
       addAddress: (address) => {
@@ -93,7 +99,6 @@ export const useAuthStore = create<AuthState>()(
           if (!state.user) return {};
           const currentAddresses = state.user.addresses || [];
           const updated = currentAddresses.filter((a) => a.id !== id);
-          // If we deleted the default, set first remaining as default
           if (updated.length > 0 && !updated.some((a) => a.isDefault)) {
             updated[0].isDefault = true;
           }

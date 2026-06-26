@@ -6,7 +6,7 @@ export const SITE = {
   tagline: "Stories you carry. Silver that lasts.",
   description: "Handcrafted 92.5 Sterling Silver, delivered with care across India.",
   instagram: "https://www.instagram.com/houseofturtles.in/",
-  whatsapp: "https://wa.me/910000000000",
+  whatsapp: "https://wa.me/919491933109",
   email: "care@houseofturtles.in",
 };
 

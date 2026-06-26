@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, Trash2, ShoppingBag } from "lucide-react";
 import { useCartStore } from "@/stores/cartStore";
+import { useAuthStore } from "@/stores/authStore";
 import { formatPrice } from "@/lib/utils";
 
 /**
@@ -14,6 +15,7 @@ import { formatPrice } from "@/lib/utils";
  */
 export function CartSection() {
   const { items, updateQuantity, removeItem, clearCart } = useCartStore();
+  const { isLoggedIn } = useAuthStore();
   const router = useRouter();
 
   const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
@@ -95,6 +97,11 @@ export function CartSection() {
                     <h3 className="font-sans text-sm font-semibold text-espresso mt-0.5">
                       {item.product.name}
                     </h3>
+                    {item.size && (
+                      <p className="text-[10px] text-gold font-bold uppercase tracking-wider mt-0.5">
+                        Size: {item.size}
+                      </p>
+                    )}
                     <p className="text-xs font-semibold text-gold mt-1">
                       {formatPrice(item.product.price)}
                     </p>
@@ -104,7 +111,7 @@ export function CartSection() {
                 <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-start">
                   <div className="flex items-center border border-gold/30 rounded-pill bg-white overflow-hidden">
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
+                      onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.size)}
                       className="p-2 text-espresso hover:text-gold-bright transition-colors"
                       aria-label="Decrease quantity"
                     >
@@ -114,7 +121,7 @@ export function CartSection() {
                       {item.quantity}
                     </span>
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
+                      onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.size)}
                       className="p-2 text-espresso hover:text-gold-bright transition-colors"
                       aria-label="Increase quantity"
                     >
@@ -123,7 +130,7 @@ export function CartSection() {
                   </div>
 
                   <button
-                    onClick={() => removeItem(item.product.id)}
+                    onClick={() => removeItem(item.product.id, item.size)}
                     className="p-2 text-sand hover:text-red-600 transition-colors"
                     aria-label="Remove item"
                   >
@@ -159,7 +166,13 @@ export function CartSection() {
           </div>
 
           <button
-            onClick={() => router.push("/checkout")}
+            onClick={() => {
+              if (!isLoggedIn) {
+                router.push("/login?redirect=/checkout");
+              } else {
+                router.push("/checkout");
+              }
+            }}
             className="w-full bg-gold hover:bg-gold-light text-espresso font-semibold py-4 rounded-pill transition-colors shadow-md tracking-widest uppercase text-xs"
           >
             Proceed to Checkout

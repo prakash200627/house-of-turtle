@@ -28,7 +28,7 @@ function AccountPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as Tab | null;
-  const { isLoggedIn, user, logout, addAddress, removeAddress, setDefaultAddress } = useAuthStore();
+  const { isLoggedIn, user, signOut: logout, addAddress, removeAddress, setDefaultAddress } = useAuthStore();
   const { orders, clearOrders } = useOrderStore();
   
   const [activeTab, setActiveTab] = useState<Tab>("orders");
@@ -130,8 +130,6 @@ function AccountPageContent() {
     }
   };
 
-
-
   // Handle Profile Update simulation
   const handleUpdateProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,12 +175,17 @@ function AccountPageContent() {
         
         {/* Welcome Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-8 mb-8 border-b border-gold/15 gap-4">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-sand block">Dashboard</span>
-            <h1 className="font-display text-3xl sm:text-4xl font-bold text-espresso">
-              Welcome, {user?.name}
-            </h1>
-            <p className="text-xs text-sand font-light">Manage your sterling silver orders, addresses, and account options.</p>
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-full bg-gold text-espresso flex items-center justify-center text-2xl font-bold uppercase tracking-wider border border-gold/25 shadow-xs flex-shrink-0 select-none">
+              {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-sand block">Dashboard</span>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-espresso leading-tight">
+                Welcome, {user?.name}
+              </h1>
+              <p className="text-xs text-sand font-light">Manage your sterling silver orders, addresses, and account options.</p>
+            </div>
           </div>
           <button
             onClick={() => logout()}
@@ -299,12 +302,12 @@ function AccountPageContent() {
                           {/* Order Status Badge */}
                           <div className="sm:self-center">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              order.status === "Delivered"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-250"
-                                : (order.status === "Shipped" || order.status === "Processing")
-                                ? "bg-amber-50 text-amber-700 border border-amber-250"
-                                : "bg-red-50 text-red-700 border border-red-250"
-                            }`}>
+                                order.status === "Delivered"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-250"
+                                  : (order.status === "Shipped" || order.status === "Processing")
+                                  ? "bg-amber-50 text-amber-700 border border-amber-250"
+                                  : "bg-red-50 text-red-700 border border-red-250"
+                              }`}>
                               {order.status}
                             </span>
                           </div>
@@ -333,7 +336,7 @@ function AccountPageContent() {
                                     {item.name}
                                   </Link>
                                   <p className="text-[10px] text-sand uppercase tracking-wider mt-0.5">
-                                    Qty: {item.quantity} · {formatPrice(item.price)} each
+                                    Qty: {item.quantity} · {formatPrice(item.price)} each {item.size ? `· Size: ${item.size}` : ""}
                                   </p>
                                 </div>
                                 <div className="text-[10px] text-sand flex items-center gap-1 font-light">
@@ -485,10 +488,10 @@ function AccountPageContent() {
                       <div
                         key={addr.id}
                         className={`border rounded-card p-5 bg-white relative flex flex-col justify-between shadow-xs transition-colors ${
-                          addr.isDefault
-                            ? "border-gold-bright ring-1 ring-gold-bright"
-                            : "border-gold/15 hover:border-gold/30"
-                        }`}
+                            addr.isDefault
+                              ? "border-gold-bright ring-1 ring-gold-bright"
+                              : "border-gold/15 hover:border-gold/30"
+                          }`}
                       >
                         <div className="space-y-2">
                           <div className="flex justify-between items-start">

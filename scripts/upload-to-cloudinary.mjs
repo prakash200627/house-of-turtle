@@ -147,7 +147,7 @@ async function main() {
       }
       successCount++;
 
-      const productId = `p-${metal}-${subfolderCategory.toLowerCase().slice(0,3)}-${index}`;
+      const productId = `p-${metal}-${subfolderCategory.toLowerCase().slice(0, 3)}-${index}`;
 
       // 1. Record for the requested JSON output
       uploadedImages.push({
@@ -169,7 +169,7 @@ async function main() {
       // 3. Generate Mock Product Entry
       const price = getRealisticPrice(mappedCategory, index);
       const originalPrice = price + Math.ceil((price * 0.25) / 100) * 100; // ~25% markup for original price
-      
+
       const badgeList = ["New", "20% off", "Only 3 left", null, null, null];
       const badge = badgeList[index % badgeList.length];
 
@@ -240,12 +240,12 @@ async function main() {
   ];
 
   const updatedProductTabs = [
-    "Bracelets", 
-    "Chains & Pendants", 
-    "Earrings", 
-    "Rings", 
-    "Men", 
-    "Premium", 
+    "Bracelets",
+    "Chains & Pendants",
+    "Earrings",
+    "Rings",
+    "Men",
+    "Premium",
     "Watch Charms"
   ];
 
@@ -259,7 +259,7 @@ export const SITE = {
   tagline: "Stories you carry. Silver that lasts.",
   description: "Handcrafted 92.5 Sterling Silver, delivered with care across India.",
   instagram: "https://www.instagram.com/houseofturtles.in/",
-  whatsapp: "https://wa.me/910000000000",
+  whatsapp: "https://wa.me/919491933109",
   email: "care@houseofturtles.in",
 };
 
