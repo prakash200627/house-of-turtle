@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
+  :root {
+    --color-espresso: #1A1208;
+    --color-gold:     #C9A96E;
+    --color-cream:    #F5EDD9;
+    --color-sand:     #9B8B6E;
+    --color-offwhite: #FAFAF8;
+
+    /* HSL variables mapping to the design system colors for shadcn/ui components */
+    --background: 40 18% 97%;      /* matches offwhite #FAFAF8 */
+    --foreground: 33 50% 6%;       /* matches espresso #1A1208 */
+    
+    --card: 40 18% 97%;
+    --card-foreground: 33 50% 6%;
+    
+    --popover: 40 18% 97%;
+    --popover-foreground: 33 50% 6%;
+    
+    --primary: 39 48% 61%;         /* matches gold #C9A96E */
+    --primary-foreground: 33 50% 6%; /* espresso text on gold */
+    
+    --secondary: 40 17% 52%;       /* matches sand #9B8B6E */
+    --secondary-foreground: 40 18% 97%;
+    
+    --muted: 42 53% 91%;           /* matches cream #F5EDD9 */
+    --muted-foreground: 40 17% 52%;
+    
+    --accent: 42 53% 91%;
+    --accent-foreground: 33 50% 6%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 40 12% 88%;
+    --input: 40 12% 88%;
+    --ring: 39 48% 61%;
+    
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-offwhite text-espresso antialiased font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
