@@ -8,6 +8,13 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
+  // trustHost is required for deployments on Vercel/Render/Railway etc.
+  // Without this, NextAuth v5 beta throws "Server configuration" error
+  // when AUTH_URL doesn't exactly match the request host.
+  trustHost: true,
+
+  secret: process.env.AUTH_SECRET,
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
