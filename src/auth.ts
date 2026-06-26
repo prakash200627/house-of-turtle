@@ -62,7 +62,7 @@ export const {
       }
       return session;
     },
-    async jwt({ token, account }: { token: any; account: any }) {
+    async jwt({ token, account }: { token: any; account?: any }) {
       if (account) {
         token.accessToken = account.access_token;
       }
