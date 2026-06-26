@@ -8,17 +8,25 @@ export const {
   signIn,
   signOut,
 } = NextAuth({
-  // trustHost is required for deployments on Vercel/Render/Railway etc.
-  // Without this, NextAuth v5 beta throws "Server configuration" error
-  // when AUTH_URL doesn't exactly match the request host.
+  // Required for NextAuth v5 beta on Vercel & other cloud hosts.
+  // Tells NextAuth to trust the x-forwarded-host header from the proxy.
   trustHost: true,
 
-  secret: process.env.AUTH_SECRET,
+  // Explicitly pass secret so it works regardless of env variable naming
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          // Force re-consent to avoid stale token issues
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
     CredentialsProvider({
       id: "otp",
@@ -30,12 +38,11 @@ export const {
       async authorize(credentials: any) {
         if (!credentials?.phone || !credentials?.otp) return null;
 
-        // Simulated OTP Verification (in production, verify with Twilio/Firebase)
-        // Accepts any 6 digit OTP for the demonstration
-        if (credentials.otp.length === 6) {
+        // Demo: accept any 6-digit OTP
+        if (String(credentials.otp).length === 6) {
           return {
             id: credentials.phone,
-            name: `User ${credentials.phone.slice(-4)}`,
+            name: `User ${String(credentials.phone).slice(-4)}`,
             email: `${credentials.phone}@houseofturtles.in`,
             image: null,
           };
@@ -55,8 +62,15 @@ export const {
       }
       return session;
     },
+    async jwt({ token, account }: { token: any; account: any }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
   },
   pages: {
     signIn: "/login",
+    error: "/login",   // Redirect auth errors back to login with ?error=
   },
 });
