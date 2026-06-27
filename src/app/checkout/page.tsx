@@ -169,10 +169,15 @@ export default function CheckoutPage() {
         }
       }
 
-      // 2. Load step
+      // 2. Load step — but NEVER restore "confirmation" step.
+      // If the user comes back to /checkout after completing an order,
+      // they should always start a fresh checkout, not see the old success screen.
       const savedStep = localStorage.getItem("hot-checkout-step") as CheckoutStep | null;
-      if (savedStep && ["auth", "shipping", "payment", "confirmation"].includes(savedStep)) {
+      if (savedStep && savedStep !== "confirmation" && ["auth", "shipping", "payment"].includes(savedStep)) {
         setStep(savedStep);
+      } else if (savedStep === "confirmation") {
+        // Clear stale confirmation state so next checkout starts clean
+        localStorage.removeItem("hot-checkout-step");
       }
 
       setIsCheckoutLoaded(true);
